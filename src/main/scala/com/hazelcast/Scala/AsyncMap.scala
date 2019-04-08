@@ -4,10 +4,10 @@ import java.util.Map.Entry
 import java.util.concurrent.TimeUnit
 
 import scala.beans.BeanProperty
-import scala.concurrent.{ ExecutionContext, Future }
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.Duration
-
 import com.hazelcast.core._
+import com.hazelcast.query.Predicate
 
 final class AsyncMap[K, V] private[Scala] (protected val imap: IMap[K, V])
     extends KeyedIMapAsyncDeltaUpdates[K, V] {
@@ -82,7 +82,38 @@ final class AsyncMap[K, V] private[Scala] (protected val imap: IMap[K, V])
     callback.future
   }
 
+  //@todo async versions
+  def lock(key: K, leaseTime: Duration): Unit = {
+    imap.lock(key, leaseTime.toMillis, TimeUnit.MILLISECONDS)
+  }
+
+  def tryLock(key: K, leaseTime: Duration, maxWaitingTime: Duration = Duration.Zero): Boolean = {
+    imap.tryLock(key, maxWaitingTime.toMillis, TimeUnit.MILLISECONDS, leaseTime.toMillis, TimeUnit.MILLISECONDS)
+  }
+
+  def unlock(key: K): Unit = {
+    imap.unlock(key)
+  }
+
+  def forceUnlock(key: K): Unit = {
+    imap.forceUnlock(key)
+  }
+
+  def isLocked(key: K): Boolean = {
+    imap.isLocked(key)
+  }
+
+  def addAllEntriesListener(entryListener: com.hazelcast.map.listener.EntryAddedListener[K, V], includeValue: Boolean): String = {
+    addEntryListener(entryListener, (_, _) => true, includeValue)
+  }
+
+  def addEntryListener(mapListener: com.hazelcast.map.listener.EntryAddedListener[K, V], f: (K, V) => Boolean, includeValue: Boolean): String = {
+    imap.addEntryListener(mapListener, includeValue.booleanValue)
+  }
+
+  def removeEntryListener(listenerId: String): Boolean = imap.removeEntryListener(listenerId)
 }
+
 
 private[Scala] object AsyncMap {
   final class GetAsEP[V, R](val mf: V => R)
